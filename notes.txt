@@ -1,0 +1,339 @@
+Project 1A Terminal I/O and Inter-Process Communication
+
+Aspects:
+Terminal I/O and modes (as an example of a complex API set)
+Polled I/O (a means of awaiting input from multiple sources)
+Inter-process communication
+Exception handling
+
+
+Shell vs Terminal
+A shell is a user interface for access to an operating system's services. Most often the user interacts with the shell using a command-line interface (CLI). 
+
+The terminal is a program that opens a graphical window and lets you interact with the shell.
+
+Functions:
+
+Manipulating terminal attributes:
+
+#include <termios.h>
+#include <unistd.h>
+ The termios functions describe a general terminal interface that is provided to control asynchronous communications ports.
+
+1) tcgetattr(3)
+gets the parameters associated with the object referred by fd and stores them in the termios structure referenced by termios_p. This function may be invoked from a background process; however, the terminal attributes may be subsequently changed by a foreground process.
+
+int tcgetattr(int fd, struct termios *termios_p);
+
+termios_p argument that is a pointer to a termios structure. This structure contains at least the following members:
+tcflag_t c_iflag;      /* input modes */
+tcflag_t c_oflag;      /* output modes */
+tcflag_t c_cflag;      /* control modes */
+tcflag_t c_lflag;      /* local modes */
+cc_t     c_cc[NCCS];   /* special characters */
+
+c_iflag flag constants:
+
+ISTRIP
+
+Strip off eighth bit.
+
+For our project use:
+	c_iflag = ISTRIP;	/* only lower 7 bits	*/
+	c_oflag = 0;		/* no processing	*/
+	c_lflag = 0;		/* no processing	*/
+
+
+tcsetattr(3)
+
+ sets the parameters associated with the terminal (unless support is required from the underlying hardware that is not available) from the termios structure referred to by termios_p. optional_actions specifies when the changes take effect:
+
+TCSANOW
+the change occurs immediately. ( WE USED TCASNOW in this project)
+
+TCSADRAIN
+the change occurs after all output written to fd has been transmitted. This function should be used when changing parameters that affect output.
+TCSAFLUSH
+the change occurs after all output written to the object referred by fd has been transmitted, and all input that has been received but not read will be discarded before the change is made.
+
+
+Canonical and noncanonical mode (what we are doing)
+
+In noncanonical mode input is available immediately (without the user having to type a line-delimiter character), no input processing is performed, and line editing is disabled. 
+
+In character-at-a-time mode, you get characters as soon as they are typed, without waiting for a newline.
+
+***The settings of MIN (c_cc[VMIN]) and TIME (c_cc[VTIME]) determine the circumstances in which a read(2) completes; there are four distinct cases:
+
+*
+MIN == 0; TIME == 0: If data is available, read(2) returns immediately, with the lesser of the number of bytes available, or the number of bytes requested. If no data is available, read(2) returns 0.
+
+*
+
+MIN > 0; TIME == 0: read(2) blocks until the lesser of MIN bytes or the number of bytes requested are available, and returns the lesser of these two values.
+
+*
+
+MIN == 0; TIME > 0: TIME specifies the limit for a timer in tenths of a second. The timer is started when read(2) is called. read(2) returns either when at least one byte of data is available, or when the timer expires. If the timer expires without any input becoming available, read(2) returns 0.
+
+*
+
+MIN > 0; TIME > 0: TIME specifies the limit for a timer in tenths of a second. Once an initial byte of input becomes available, the timer is restarted after each further byte is received. read(2) returns either when the lesser of the number of bytes requested or MIN byte have been read, or when the inter-byte timeout expires. Because the timer is only started after the initial byte becomes available, at least one byte will be read.
+
+
+map received <cr> or <lf> into <cr><lf> (see below for a note on carriage return, linefeed, and EOF).
+
+A line feed means moving one line forward. The code is \n.
+A carriage return means moving the cursor to the beginning of the line. The code is \r.
+
+upon detecting a pre-defined escape sequence (^D), restore normal terminal modes and exit (hint: do this by saving the normal terminal settings when you start up, and restoring them on exit).
+
+Passing input and output between two processes
+
+First off, let's talk about 
+fork(2) ... for creating new processes
+waitpid(2) ... to allow one process to monitor another process's state, and react to changes in state
+exec(3) ... a family of calls for loading a new program into a running process
+pipe(2) ... for inter-process communication
+kill(3) ... for sending signals to processes by PID
+strerror(3) ... descriptions associated with system call errors
+poll(2) ... to wait for the first of multiple input sources
+________________________________________
+waitpid(2)
+
+#include <sys/types.h>
+#include <sys/wait.h>
+pid_t waitpid(pid_t pid, int *status, int options);
+
+wait for state changes in a child of the calling process, and obtain information about the child whose state has changed. A state change is considered to be: the child terminated; the child was stopped by a signal; or the child was resumed by a signal. In the case of a terminated child, performing a wait allows the system to release the resources associated with the child; if a wait is not performed, then the terminated child remains in a "zombie" state (see NOTES below).
+
+If a child has already changed state, then these calls return immediately. Otherwise they block until either a child changes state or a signal handler interrupts the call (assuming that system calls are not automatically restarted using the SA_RESTART flag of sigaction(2)). In the remainder of this page, a child whose state has changed and which has not yet been waited upon by one of these system calls is termed waitable.
+
+waitpid(-1, &status, 0);
+The waitpid() system call suspends execution of the calling process until a child specified by pid argument has changed state. 
+
+By default, waitpid() waits only for terminated children, but this behavior is modifiable via the options argument, as described below.
+The value of pid can be:
+
+< -1
+meaning wait for any child process whose process group ID is equal to the absolute value of pid.
+
+-1
+
+meaning wait for any child process.
+
+0
+
+meaning wait for any child process whose process group ID is equal to that of the calling process.
+
+> 0
+
+meaning wait for the child whose process ID is equal to the value of pid
+
+
+https://linux.die.net/man/2/waitpid
+waitpid(): on success, returns the process ID of the child whose state has changed; if WNOHANG was specified and one or more child(ren) specified by pid exist, but have not yet changed state, then 0 is returned. On error, -1 is returned.
+_______________________________
+
+exec(3)
+       #include <unistd.h>
+
+       extern char **environ;
+
+       int execl(const char *pathname, const char *arg, ...
+                       /* (char  *) NULL */);
+       int execlp(const char *file, const char *arg, ...
+                       /* (char  *) NULL */);
+       int execle(const char *pathname, const char *arg, ...
+                       /*, (char *) NULL, char *const envp[] */);
+       int execv(const char *pathname, char *const argv[]);
+       int execvp(const char *file, char *const argv[]);
+       int execvpe(const char *file, char *const argv[],
+                       char *const envp[]);
+https://man7.org/linux/man-pages/man2/execve.2.html for execve
+
+v - execv(), execvp(), execvpe()
+       The char *const argv[] argument is an array of pointers to null-
+       terminated strings that represent the argument list available to
+       the new program.  The first argument, by convention, should point
+       to the filename associated with the file being executed.  The
+       array of pointers must be terminated by a null pointer.
+
+   e - execle(), execvpe()
+       The environment of the caller is specified via the argument envp.
+       The envp argument is an array of pointers to null-terminated
+       strings and must be terminated by a null pointer.
+
+       All other exec() functions (which do not include 'e' in the
+       suffix) take the environment for the new process image from the
+       external variable environ in the calling process.
+
+RETURN VALUE         top
+       The exec() functions return only if an error has occurred.  The
+       return value is -1, and errno is set to indicate the error.
+_________________________________
+
+pipe(2) ... for inter-process communication
+
+ pipe, pipe2 - create pipe
+
+    #include <unistd.h>
+
+    /* On Alpha, IA-64, MIPS, SuperH, and SPARC/SPARC64; see NOTES */
+       struct fd_pair {
+           long fd[2];
+       };
+       struct fd_pair pipe();
+
+       /* On all other architectures */
+       int pipe(int pipefd[2]);
+
+pipe() creates a pipe, a unidirectional data channel that can be
+       used for interprocess communication.  The array pipefd is used to
+       return two file descriptors referring to the ends of the pipe.
+       pipefd[0] refers to the read end of the pipe.  pipefd[1] refers
+       to the write end of the pipe.  Data written to the write end of
+       the pipe is buffered by the kernel until it is read from the read
+       end of the pipe.
+
+On success, zero is returned.  On error, -1 is returned, errno is
+       set appropriately, and pipefd is left unchanged.
+
+       On Linux (and other systems), pipe() does not modify pipefd on
+       failure.  A requirement standardizing this behavior was added in
+       POSIX.1-2008 TC2.  The Linux-specific pipe2() system call
+       likewise does not modify pipefd on failure.
+________________________________________________________
+
+kill(3) ... for sending signals to processes by PID
+
+
+#include <signal.h>
+
+int kill(pid_t pid, int sig);
+
+The kill() function shall send a signal to a process or a group of processes specified by pid. The signal to be sent is specified by sig and is either one from the list given in <signal.h> or 0. If sig is 0 (the null signal), error checking is performed but no signal is actually sent. The null signal can be used to check the validity of pid.
+
+Return Value
+Upon successful completion, 0 shall be returned. Otherwise, -1 shall be returned and errno set to indicate the error.
+
+Errors
+The kill() function shall fail if:
+
+EINVAL
+The value of the sig argument is an invalid or unsupported signal number.
+EPERM
+The process does not have permission to send the signal to any receiving process.
+ESRCH
+No process or process group can be found corresponding to that specified by pid.
+
+If pid is greater than 0, sig shall be sent to the process whose process ID is equal to pid.
+
+If pid is 0, sig shall be sent to all processes (excluding an unspecified set of system processes) whose process group ID is equal to the process group ID of the sender, and for which the process has permission to send a signal.
+
+If pid is -1, sig shall be sent to all processes (excluding an unspecified set of system processes) for which the process has permission to send that signal.
+
+If pid is negative, but not -1, sig shall be sent to all processes (excluding an unspecified set of system processes) whose process group ID is equal to the absolute value of pid, and for which the process has permission to send a signal.
+
+If the value of pid causes sig to be generated for the sending process, and if sig is not blocked for the calling thread and if no other thread has sig unblocked or is waiting in a sigwait() function for sig, either sig or at least one pending unblocked signal shall be delivered to the sending thread before kill() returns.
+
+___________________________________________________________
+poll(2) ... to wait for the first of multiple input sources
+wait for some event on a file descriptor
+
+ #include <poll.h>
+
+       int poll(struct pollfd *fds, nfds_t nfds, int timeout);
+
+it waits for one of
+       a set of file descriptors to become ready to perform I/O.
+
+ The set of file descriptors to be monitored is specified in the
+       fds argument, which is an array of structures of the following
+       form:
+
+           struct pollfd {
+               int   fd;         /* file descriptor */
+               short events;     /* requested events */
+               short revents;    /* returned events */
+           };
+
+The caller should specify the number of items in the fds array in
+       nfds.
+
+      * The field fd contains a file descriptor for an **open file.  If
+       this field is negative, then the corresponding events field is
+       ignored and the revents field returns zero.
+
+         (This provides an
+       easy way of ignoring a file descriptor for a single poll() call:
+       simply negate the fd field.  Note, however, that this technique
+       can't be used to ignore file descriptor 0.)
+
+       The field events is an ***input parameter, a bit mask specifying the
+       events the application is interested in for the file descriptor
+       fd.  This field may be specified as zero, in which case the only
+       events that can be returned in revents are POLLHUP, POLLERR, and
+       POLLNVAL (see below).
+
+
+         If none of the events requested (and no error) has occurred for
+       any of the file descriptors, then poll() blocks until one of the
+       events occurs.
+
+ The timeout argument specifies the number of milliseconds that
+       poll() should block waiting for a file descriptor to become
+       ready.  The call will block until either:
+
+       • a file descriptor becomes ready;
+
+       • the call is interrupted by a signal handler; or
+
+       • the timeout expires.
+
+       Note that the timeout interval will be rounded up to the system
+       clock granularity, and kernel scheduling delays mean that the
+       blocking interval may overrun by a small amount.  Specifying a
+       negative value in timeout means an infinite timeout.  Specifying
+       a timeout of zero causes poll() to return immediately, even if no
+       file descriptors are ready.
+
+       The bits that may be set/returned in events and revents are
+       defined in <poll.h>:
+
+
+  POLLERR
+              Error condition (only returned in revents; ignored in
+              events).  This bit is also set for a file descriptor
+              referring to the write end of a pipe when the read end has
+              been closed.
+
+ POLLOUT
+              Writing is now possible, though a write larger than the
+              available space in a socket or pipe will still block
+              (unless O_NONBLOCK is set).
+
+
+ POLLHUP
+              Hang up (only returned in revents; ignored in events).
+              Note that when reading from a channel such as a pipe or a
+              stream socket, this event merely indicates that the peer
+              closed its end of the channel.  Subsequent reads from the
+              channel will return 0 (end of file) only after all
+              outstanding data in the channel has been consumed.
+
+____________________________________________________________
+**fork to create a new process, and then exec a shell (/bin/bash, with no arguments other than its name), whose standard input is a pipe from the terminal process, and whose standard output and standard error are ****(dups of) a pipe to the terminal process. 
+
+***(You will need two pipes, one for each direction of communication, as pipes are unidirectional.)
+
+read (ASCII) input from the keyboard, echo it to stdout, and forward it to the shell. <cr> or <lf> should echo as <cr><lf> but go to shell as <lf>.
+
+
+read input from the **shell pipe and write it to ***stdout. 
+
+**If it receives an <lf> from the shell, it should print it to the screen as <cr><lf>
+
+The trick here is that will not be a strict alternation between input from the keyboard and input from the shell. Either is capable of generating input at any time. If we do a read(2) from the keyboard, we will block until keyboard input becomes available, even if there is input from the shell pipe waiting for us! 
+
+**The poll(2) system call enable us to solve this problem:

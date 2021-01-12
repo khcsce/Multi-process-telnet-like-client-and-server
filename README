@@ -1,0 +1,36 @@
+NAME: Khoa Quach
+EMAIL: khoaquachschool@gmail.com
+ID: 105123806
+
+Content:
+lab1a-105123806.tar.gz which contains:
+lab1a.c
+README (this file)
+Makefile
+
+Makefile: 
+default ... builds lab1a exec, 
+clean ... deletes files created by the Makefile
+dist ... builds a distribution tarball of files: lab1a.c, Makefile, READ, lab1a-105123806.tar.gz
+
+lab1a.c is the source code  for a multi process telnet lile client and server
+Character at a time full duplex terminal I/O
+that supports passing input and output between two processes if --shell option is used
+The new process can exec a shell
+
+Testing methodology:
+primarily the sanity check script given
+Aside from that, testing inputs, CR, LF, behaviors when ctrlC and ctrlD are pressed on
+my keyboard. Examining shell exit status to see if signals were working correctly.
+Sources
+https://www.gnu.org/software/libc/manual/html_node/Noncanon-Example.html #mine uses this
+https://www.gnu.org/software/libc/manual/html_node/index.html#toc-Pipes-and-FIFOs-1
+https://www.geeksforgeeks.org/input-output-system-calls-c-create-open-close-read-write/
+https://www.geeksforgeeks.org/c-program-demonstrate-fork-and-pipe/
+http://www.cs.loyola.edu/~jglenn/702/S2005/Examples/dup2.html
+https://github.com/raoulmillais/linux-system-programming/blob/master/src/poll-example.c
+https://stackoverflow.com/questions/3659616/why-does-wait-set-status-to-256-instead-of-the-1-exit-status-of-the-forked-pr
+https://www.thegeekstuff.com/2010/11/50-linux-commands/
+https://stackoverflow.com/questions/47441871/why-should-we-check-wifexited-after-wait-in-order-to-kill-child-processes-in-lin
+https://www.geeksforgeeks.org/exit-status-child-process-linux/
+http://www.unixguide.net/unix/programming/2.1.2.shtml

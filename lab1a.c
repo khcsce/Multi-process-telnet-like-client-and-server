@@ -179,9 +179,6 @@ void read_write(){
 			{
 				write_with_check(1,&crlf,sizeof(char)*2);
 			}
-			//else if (c == CTRLC){
-		//	    write_with_check(1,&arrow_C,sizeof(char)*2);
-		//	}
 			else{
 				//write_with_check(1,&crlf, sizeof(char)*1);
 				write_with_check(1,&c, sizeof(char)*1);
@@ -307,8 +304,6 @@ void parent_case() {
 									write_with_check(1,&c, sizeof(char)*1);
 							}
 							close(c_to_p[0]);
-							// NEW
-							//close(p_to_c[1]);
 							exit(0);
 					} // if CTRLD
 					else if (c == CTRLC || c == 0x03){

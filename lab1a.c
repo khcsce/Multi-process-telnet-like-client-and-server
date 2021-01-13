@@ -198,11 +198,11 @@ void shell_exit(){
 	// https://stackoverflow.com/questions/3659616/why-does-wait-set-status-to-256-instead-of-the-1-exit-status-of-the-forked-pr
 	//https://www.geeksforgeeks.org/exit-status-child-process-linux/
 	//https://stackoverflow.com/questions/3659616/why-does-wait-set-status-to-256-instead-of-the-1-exit-status-of-the-forked-pr
-	if (WIFEXITED(status)) {
+	if (WIFEXITED(status)) { // something like CtrlD
 		fprintf(stderr,"SHELL EXIT SIGNAL=%d STATUS=%d\n", WTERMSIG(status), WEXITSTATUS(status));
 		//exit(0); // dont need really
 	}
-	if (WIFSIGNALED(status)){
+	if (WIFSIGNALED(status)){ // send signal if CtrlC
 	    fprintf(stderr,"SHELL EXIT SIGNAL=%d STATUS=%d\n", WTERMSIG(status), WEXITSTATUS(status));
 	    //exit(0);
 	}
@@ -215,9 +215,9 @@ void make_pipe(int p[2]){
 	}
 }
 void signal_handler(int sig){
-	// THESE TWO LINES NEW:
-	close(p_to_c[1]);
-	close(c_to_p[0]);
+	// at this point we're done so just close the interprocess
+	check_close(p_to_c[1]);
+	check_close(c_to_p[0]);
 	if(sig == SIGPIPE || sig == SIGINT){
 		kill(pid, SIGINT);
 		shell_exit();
@@ -341,7 +341,9 @@ void parent_case() {
 			} // end POLLUP POLLERR
 		} // if ret > 0
 	} // while(1)
-	
+	// reassurance if kill is not called
+	check_close(c_to_p[0]);
+	check_close(p_to_c[1]);
 } // parent_case
 
 // http://www.cs.loyola.edu/~jglenn/702/S2005/Examples/dup2.html

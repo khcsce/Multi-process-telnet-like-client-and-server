@@ -317,7 +317,7 @@ void parent_case() {
 						write_with_check(p_to_c[1],&lf,sizeof(char)*1);
 					} // if CR or LF
 					else{
-						write_with_check(0,&c,sizeof(char)*1);
+						write_with_check(1,&c,sizeof(char)*1);
 						write_with_check(p_to_c[1],&c,sizeof(char)*1);
 					}
 

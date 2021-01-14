@@ -303,7 +303,7 @@ void parent_case() {
 								else
 									write_with_check(1,&c, sizeof(char)*1);
 							}
-							close(c_to_p[0]);
+							check_close(c_to_p[0]);
 							exit(0);
 					} // if CTRLD
 					else if (c == CTRLC || c == 0x03){

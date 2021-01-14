@@ -339,6 +339,10 @@ void parent_case() {
 			if ((POLLHUP | POLLERR) & shell_e){
 				exit(0);
 			} // end POLLUP POLLERR
+			// TA says to exit(1) but this will not be tested
+			if ((POLLHUP | POLLERR) & stdin_e){
+                                exit(1);
+                        } //
 		} // if ret > 0
 	} // while(1)
 	// reassurance if kill is not called

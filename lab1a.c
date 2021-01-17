@@ -83,7 +83,7 @@ int main(int argc, char **argv){
 		make_pipe(p_to_c);
 		atexit(shell_exit); // reassurance if signal handler doesn't work as intender 
 		signal(SIGPIPE, signal_handler);
-		signal(SIGINT, signal_handler);
+		//		signal(SIGINT, signal_handler);
 		pid = fork(); // create new process => child
 		if (pid == -1)
 			print_error("fork() error");
@@ -101,8 +101,8 @@ int main(int argc, char **argv){
 }
 /*---------error message helper function --------*/
 void print_error(const char* msg){
-	fprintf(stderr, "%s , error number: %d, strerror: %s\n ",msg, errno, strerror(errno));
-    exit(1);
+  fprintf(stderr, "%s , error number: %d, strerror: %s\n ",msg, errno, strerror(errno));
+  exit(1);
 }
 /*-----------input mode non canonical setting ----------*/
 /*
@@ -215,11 +215,10 @@ void make_pipe(int p[2]){
 	}
 }
 void signal_handler(int sig){
-	// at this point we're done so just close the interprocess
 	check_close(p_to_c[1]);
 	check_close(c_to_p[0]);
-	if(sig == SIGPIPE || sig == SIGINT){
-		kill(pid, SIGINT);
+	if(sig == SIGPIPE){
+	  //kill(pid, SIGINT);
 		shell_exit();
 		exit(0); //dont need really
 	}
